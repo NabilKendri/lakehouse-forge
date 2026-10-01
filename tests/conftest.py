@@ -3,4 +3,4 @@ from pyspark.sql import SparkSession
 
 @pytest.fixture(scope="session")
 def spark():
-    return Sparksession.builder.getOrCreate()
+    return SparkSession.builder.getOrCreate()
