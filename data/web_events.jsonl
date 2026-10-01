@@ -1,0 +1,7 @@
+{"event_id": 1, "custkey": 179329, "event_type": "page_view", "amount": "0", "event_time": "2026-09-01 10:15:00"}
+{"event_id": 2, "custkey": 473245, "event_type": "purchase", "amount": "120.50", "event_time": "2026-09-01 11:02:10"}
+{"event_id": 3, "custkey": 77549, "event_type": "purchase", "amount": "75", "event_time": "2026/09/02 09:30:00"}
+{"event_id": 4, "custkey": 610651, "event_type": "page_view", "amount": null, "event_time": "2026-09-02 14:45:00"}
+{"event_id": 5, "custkey": null, "event_type": "purchase", "amount": "40.00", "event_time": "2026-09-03 08:00:00"}
+{"event_id": 2, "custkey": 473245, "event_type": "purchase", "amount": "120.50", "event_time": "2026-09-01 11:02:10"}
+{"event_id": 6, "custkey": 179329, "event_type": "refund", "amount": "-20.00", "event_time": "2026-09-04 16:20:00"}
