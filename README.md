@@ -34,6 +34,63 @@ The pipeline follows the medallion pattern:
 
 Sources -> Bronze -> Silver -> Validation -> Gold
 
+```mermaid
+flowchart LR
+	subgraph sources["Sources"]
+		orders_source["samples.tpch.orders<br/>Structured SQL"]
+		events_source["web_events.jsonl<br/>Semi-structured JSON Lines"]
+	end
+
+	subgraph bronze["Bronze - Raw<br/>Adds _ingested_at and _source_file<br/>No cleaning"]
+		bronze_orders["bronze.orders"]
+		bronze_events["bronze.web_events"]
+	end
+
+	subgraph silver["Silver - Cleaned"]
+		silver_orders["silver.orders_clean"]
+		silver_events["silver.web_events_clean"]
+		rejected_events["silver.web_events_rejected"]
+		customer_events["silver.customer_events"]
+	end
+
+	subgraph validation["Validation"]
+		validate_silver["12_validate_silver<br/>Schema, nulls, uniqueness<br/>Allowed values"]
+	end
+
+	subgraph gold["Gold - Business Ready"]
+		customer_summary["gold.customer_summary"]
+	end
+
+	pipeline_stops["Pipeline stops"]
+
+	orders_source --> bronze_orders
+	events_source --> bronze_events
+	bronze_orders --> silver_orders
+	bronze_events --> silver_events
+	bronze_events -->|null custkey| rejected_events
+	silver_orders -->|join on custkey| customer_events
+	silver_events --> customer_events
+	silver_events --> validate_silver
+	validate_silver -->|pass| customer_summary
+	validate_silver -. fail .-> pipeline_stops
+
+	classDef sources fill:#e8f0f3,stroke:#607d8b,stroke-width:1.5px,color:#202b33;
+	classDef bronze fill:#f2dfc6,stroke:#9a6b32,stroke-width:1.5px,color:#302315;
+	classDef silver fill:#e4ebef,stroke:#708795,stroke-width:1.5px,color:#202b33;
+	classDef validation fill:#e9e9e6,stroke:#73766f,stroke-width:1.5px,color:#282a27;
+	classDef gold fill:#f6edc9,stroke:#a58b38,stroke-width:1.5px,color:#302a16;
+	classDef rejected fill:#f1dddd,stroke:#a85e5e,stroke-width:1.5px,color:#3a2020;
+	classDef failure fill:#f1dddd,stroke:#a85e5e,stroke-width:1.5px,color:#3a2020;
+
+	class orders_source,events_source sources;
+	class bronze_orders,bronze_events bronze;
+	class silver_orders,silver_events,customer_events silver;
+	class rejected_events rejected;
+	class validate_silver validation;
+	class customer_summary gold;
+	class pipeline_stops failure;
+```
+
 1. **Bronze** keeps source data with ingestion metadata.
 2. **Silver** cleans the web events and orders, stores invalid web events separately, and joins event records with order history.
 3. **Validation** checks the cleaned Silver event table before the Gold aggregation is built.
@@ -121,6 +178,11 @@ At a high level, the test run loads `conftest.py`, imports the tests and transfo
 ## Databricks Workflow
 
 The Databricks job is named `lakehouse-forge-etl`. The job has five dependent tasks in this order, runs daily, and sends an email on failure:
+
+```mermaid
+flowchart LR
+	run_tests --> ingest_bronze --> transform_silver --> validate_silver --> build_gold
+```
 
 | Order | Task | Notebook | Purpose |
 | --- | --- | --- | --- |
