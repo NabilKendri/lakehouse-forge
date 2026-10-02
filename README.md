@@ -35,30 +35,35 @@ The pipeline follows the medallion pattern:
 Sources -> Bronze -> Silver -> Validation -> Gold
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 20, "padding": 6}, "themeVariables": {"fontSize": "20px"}}}%%
 flowchart LR
 	subgraph sources["Sources"]
-		orders_source["samples.tpch.orders<br/>Structured SQL"]
-		events_source["web_events.jsonl<br/>Semi-structured JSON Lines"]
+		direction TB
+		orders_source["samples.tpch.<br/>orders<br/>Structured SQL"]
+		events_source["web_events.jsonl<br/>Semi-structured<br/>JSON Lines"]
 	end
 
-	subgraph bronze["Bronze - Raw<br/>Adds _ingested_at and _source_file<br/>No cleaning"]
-		bronze_orders["bronze.orders"]
-		bronze_events["bronze.web_events"]
+	subgraph bronze["Bronze - Raw"]
+		direction TB
+		bronze_orders["bronze.<br/>orders"]
+		bronze_events["bronze.<br/>web_events"]
+		bronze_note["Adds _ingested_at<br/>and _source_file<br/>No cleaning"]
 	end
 
 	subgraph silver["Silver - Cleaned"]
-		silver_orders["silver.orders_clean"]
-		silver_events["silver.web_events_clean"]
-		rejected_events["silver.web_events_rejected"]
-		customer_events["silver.customer_events"]
+		direction TB
+		silver_orders["silver.orders_<br/>clean"]
+		silver_events["silver.web_events<br/>_clean"]
+		rejected_events["silver.web_events<br/>_rejected"]
+		customer_events["silver.customer_<br/>events"]
 	end
 
 	subgraph validation["Validation"]
-		validate_silver["12_validate_silver<br/>Schema, nulls, uniqueness<br/>Allowed values"]
+		validate_silver["12_validate_<br/>silver<br/>Schema, nulls<br/>Uniqueness, allowed values"]
 	end
 
 	subgraph gold["Gold - Business Ready"]
-		customer_summary["gold.customer_summary"]
+		customer_summary["gold.<br/>customer_summary"]
 	end
 
 	pipeline_stops["Pipeline stops"]
@@ -73,6 +78,8 @@ flowchart LR
 	silver_events --> validate_silver
 	validate_silver -->|pass| customer_summary
 	validate_silver -. fail .-> pipeline_stops
+	customer_events --> customer_summary
+	customer_events ~~~ validate_silver
 
 	classDef sources fill:#e8f0f3,stroke:#607d8b,stroke-width:1.5px,color:#202b33;
 	classDef bronze fill:#f2dfc6,stroke:#9a6b32,stroke-width:1.5px,color:#302315;
@@ -83,7 +90,7 @@ flowchart LR
 	classDef failure fill:#f1dddd,stroke:#a85e5e,stroke-width:1.5px,color:#3a2020;
 
 	class orders_source,events_source sources;
-	class bronze_orders,bronze_events bronze;
+	class bronze_orders,bronze_events,bronze_note bronze;
 	class silver_orders,silver_events,customer_events silver;
 	class rejected_events rejected;
 	class validate_silver validation;
