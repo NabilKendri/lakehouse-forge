@@ -6,13 +6,14 @@ An ETL learning project that turns structured order data and semi-structured web
 
 Data from different systems arrives in different formats and may contain duplicates, missing keys, inconsistent dates, or values that need normalization. Lakehouse Forge demonstrates a layered workflow for ingesting that data, preserving the raw inputs, cleaning and validating them, and publishing customer-level aggregates.
 
-The project is designed as a learning exercise. The notebooks show the Databricks workflow, while reusable transformation and validation logic lives in `src/` and unit tests live in `tests/`.
+The notebooks show the Databricks workflow, while reusable transformation and validation logic lives in `src/` and unit tests live in `tests/`. Bronze keeps the raw data replayable, Silver makes it trustworthy, and Gold makes it ready to query.
 
 ## Technology Stack
 
 - Python and PySpark
 - SQL
 - Databricks notebooks, volumes, and Workflows
+- Databricks Free Edition with serverless compute
 - Delta Lake tables and constraints
 - PyTest
 - Git
@@ -30,6 +31,8 @@ flowchart LR
 ```
 
 The pipeline follows the medallion pattern:
+
+Sources -> Bronze -> Silver -> Validation -> Gold
 
 1. **Bronze** keeps source data with ingestion metadata.
 2. **Silver** cleans the web events and orders, stores invalid web events separately, and joins event records with order history.
@@ -59,7 +62,7 @@ The SQL source does not currently add `_source_file`; that metadata column is ad
 
 ### Silver
 
-- `workspace.silver.web_events_clean` excludes events with a null `custkey`, removes duplicate `event_id` values, casts `amount` to `decimal(10,2)`, replaces null or non-castable amounts with zero, and parses `event_time` after replacing `/` with `-`.
+- `workspace.silver.web_events_clean` excludes events with a null `custkey`, removes duplicate `event_id` values, casts `amount` to `decimal(10,2)`, then widens it to `decimal(12,2)` because `coalesce` replaces null amounts with a literal integer zero, and parses `event_time` after replacing `/` with `-`.
 - `workspace.silver.web_events_rejected` retains events with a null `custkey`. Bad rows are kept aside, not deleted from the workflow.
 - `workspace.silver.orders_clean` filters orders without order or customer keys, deduplicates on `o_orderkey`, and retains the selected order fields.
 - `workspace.silver.customer_events` left-joins cleaned events to per-customer order counts and order values.
@@ -117,7 +120,7 @@ At a high level, the test run loads `conftest.py`, imports the tests and transfo
 
 ## Databricks Workflow
 
-The Databricks job is named `lakehouse-forge-etl`. According to the project configuration, it has five dependent tasks in this order, runs daily, and sends an email on failure:
+The Databricks job is named `lakehouse-forge-etl`. The job has five dependent tasks in this order, runs daily, and sends an email on failure:
 
 | Order | Task | Notebook | Purpose |
 | --- | --- | --- | --- |
@@ -147,6 +150,7 @@ lakehouse-forge/
 │   ├── 12_validate_silver.ipynb     # Validation workflow task
 │   └── 13_build_gold.ipynb          # Gold workflow task
 ├── src/
+│   ├── __init__.py                 # Makes src importable
 │   ├── transform.py                # Web-event cleaning and rejection logic
 │   └── validate.py                 # Reusable DataFrame validation checks
 └── tests/
@@ -165,17 +169,22 @@ The notebooks use Databricks sample data and workspace objects, so they are inte
 
 ## Results
 
-The workflow is expected to produce these tables:
+The workflow produces these tables:
 
 - Bronze: `workspace.bronze.orders`, `workspace.bronze.web_events`
 - Silver: `workspace.silver.web_events_clean`, `workspace.silver.web_events_rejected`, `workspace.silver.orders_clean`, `workspace.silver.customer_events`
 - Gold: `workspace.gold.customer_summary`
 
-No fixed row counts or screenshots are included yet; the source file and Databricks sample data determine the output for each run.
+- Bronze `web_events`: 7 rows
+- Silver `web_events_clean`: 5 rows
+- Silver `web_events_rejected`: 1 row
+- Gold `customer_summary`: 4 rows
+
+The five-task job completes successfully end to end.
 
 ## Implementation Notes
 
-- `src/transform.py` casts `amount` to `decimal(10,2)`, while `12_validate_silver.ipynb` currently expects `decimal(12,2)`. Align these types before relying on the scheduled validation task; otherwise the schema check may fail.
+- Spark widens `decimal(10,2)` to `decimal(12,2)` when coalescing with an integer literal zero; the validation step expects the widened type.
 - The pipeline currently overwrites its output tables on each run rather than processing only new or changed records.
 
 ## Future Improvements
